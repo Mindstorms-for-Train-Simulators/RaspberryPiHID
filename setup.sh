@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🔧 Step 1: Update boot configuration files..."
+echo "Step 1: Update boot configuration files..."
 
 CONFIG_PATH="/boot/firmware/config.txt"
 CMDLINE_PATH="/boot/firmware/cmdline.txt"
@@ -14,12 +14,12 @@ CMDLINE=$(cat "$CMDLINE_PATH")
 if [[ "$CMDLINE" != *"modules-load=dwc2,libcomposite"* ]]; then
   CMDLINE=$(echo "$CMDLINE" | sed 's/\brootwait\b/& modules-load=dwc2,libcomposite/')
   echo "$CMDLINE" > "$CMDLINE_PATH"
-  echo "✅ Updated cmdline.txt"
+  echo "Updated cmdline.txt"
 else
-  echo "⚠️ modules-load already present in cmdline.txt"
+  echo "⚠modules-load already present in cmdline.txt"
 fi
 
-echo "🧠 Step 2: Create USB gadget setup script..."
+echo "Step 2: Create USB gadget setup script..."
 
 GADGET_SCRIPT="/usr/bin/setup_usb_gadget.sh"
 cat << 'EOF' > "$GADGET_SCRIPT"
@@ -55,12 +55,12 @@ echo -ne \
 
 ln -s functions/hid.usb0 configs/c.1/
 echo "$(ls /sys/class/udc)" > UDC
-echo "✅ USB HID gadget initialized."
+echo "USB HID gadget initialized."
 EOF
 
 chmod +x "$GADGET_SCRIPT"
 
-echo "🛠️ Step 3: Register systemd service..."
+echo "Step 3: Register systemd service..."
 
 SERVICE_FILE="/etc/systemd/system/usb-gadget.service"
 cat << EOF | sudo tee "$SERVICE_FILE" > /dev/null
@@ -80,5 +80,5 @@ EOF
 sudo systemctl daemon-reexec
 sudo systemctl enable usb-gadget.service
 
-echo "🎉 Setup complete! Please reboot to activate gadget mode:"
-echo "👉 sudo reboot"
+echo "Setup complete! Please reboot to activate gadget mode:"
+echo "sudo reboot"
