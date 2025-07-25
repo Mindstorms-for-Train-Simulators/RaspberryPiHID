@@ -1,6 +1,25 @@
 #!/bin/bash
 
-echo "🔧 Configuring boot files..."
+# Create the service file
+sudo tee /etc/systemd/system/usb-gadget.service > /dev/null << 'EOF'
+[Unit]
+Description=USB Gadget Setup
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/setup_usb_gadget.sh
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable the service
+sudo systemctl daemon-reexec
+sudo systemctl enable usb-gadget.service
+
+echo "Configuring boot files..."
 
 # Paths
 CONFIG_PATH="/boot/firmware/config.txt"
