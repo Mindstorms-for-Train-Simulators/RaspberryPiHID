@@ -46,13 +46,13 @@ def send_report(hid, modifiers, keys):
     hid.flush()
 
 def start_listener():
-    print(f"🟢 EV3 HID listener on port {PORT}")
+    print(f"EV3 HID listener on port {PORT}")
 
     try:
         hid = open("/dev/hidg0", "wb")
-        print("🖱️ HID device opened.")
+        print("HID device opened.")
     except Exception as e:
-        print(f"🔴 Cannot open /dev/hidg0: {e}")
+        print(f"Cannot open /dev/hidg0: {e}")
         hid = None
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -88,20 +88,20 @@ def start_listener():
                             if keys and hid:
                                 send_report(hid, modifiers, keys)
                             elif not keys:
-                                print(f"⚠️ Unknown combo: {combo}")
+                                print(f"Unknown combo: {combo}")
                     elif msg.get("type") == "END":
                         print("[END] EV3 shut down.")
                         break
                     else:
                         print(f"[UNKNOWN] {msg}")
                 except Exception as e:
-                    print(f"⚠️ Runtime error: {e}")
+                    print(f"Runtime error: {e}")
                     break
 
 while True:
     try:
         start_listener()
     except Exception as e:
-        print(f"💥 Listener crashed: {e}")
-    print("🔄 Waiting for EV3 to reconnect...")
+        print(f"Listener crashed: {e}")
+    print("Waiting for EV3 to reconnect...")
     time.sleep(5)
