@@ -1,84 +1,56 @@
 #!/bin/bash
+set -e
 
-echo "Step 1: Update boot configuration files..."
+echo "Starting USB HID gadget setup..."
 
-CONFIG_PATH="/boot/firmware/config.txt"
-CMDLINE_PATH="/boot/firmware/cmdline.txt"
+# Constants
+GADGET="/sys/kernel/config/usb_gadget/hidpi"
 
-# Ensure gadget overlay is present
-CONFIG_LINE="dtoverlay=dwc2,dr_mode=peripheral"
-grep -qxF "$CONFIG_LINE" "$CONFIG_PATH" || echo "$CONFIG_LINE" >> "$CONFIG_PATH"
-
-# Inject module loading into cmdline
-CMDLINE=$(cat "$CMDLINE_PATH")
-if [[ "$CMDLINE" != *"modules-load=dwc2,libcomposite"* ]]; then
-  CMDLINE=$(echo "$CMDLINE" | sed 's/\brootwait\b/& modules-load=dwc2,libcomposite/')
-  echo "$CMDLINE" > "$CMDLINE_PATH"
-  echo "Updated cmdline.txt"
-else
-  echo "⚠modules-load already present in cmdline.txt"
+# Cleanup old gadget if exists
+if [ -d "$GADGET" ]; then
+  echo "Cleaning previous setup..."
+  echo "" > "$GADGET/UDC" || true
+  rm -rf "$GADGET"
 fi
 
-echo "Step 2: Create USB gadget setup script..."
+# Create gadget directory
+mkdir -p "$GADGET"
+cd "$GADGET"
 
-GADGET_SCRIPT="/usr/bin/setup_usb_gadget.sh"
-cat << 'EOF' > "$GADGET_SCRIPT"
-#!/bin/bash
-G="/sys/kernel/config/usb_gadget/g1"
-mkdir -p "$G"
-cd "$G"
+# Basic device info
+echo "0x1d6b" > idVendor  # Linux Foundation
+echo "0x0104" > idProduct # Multifunction Composite Gadget
+echo "0x0100" > bcdDevice
+echo "0x0200" > bcdUSB
 
-echo 0x1d6b > idVendor
-echo 0x0104 > idProduct
-echo 0x0100 > bcdDevice
-echo 0x0200 > bcdUSB
-
+# Strings
 mkdir -p strings/0x409
-echo "1234567890" > strings/0x409/serialnumber
-echo "EV3 Corporation" > strings/0x409/manufacturer
-echo "EV3 HID Joystick" > strings/0x409/product
+echo "123456789" > strings/0x409/serialnumber
+echo "Copilot Inc." > strings/0x409/manufacturer
+echo "Raspberry Pi HID Gadget" > strings/0x409/product
 
+# Configuration
 mkdir -p configs/c.1/strings/0x409
-echo "Config 1" > configs/c.1/strings/0x409/configuration
-echo 250 > configs/c.1/MaxPower
+echo "HID Configuration" > configs/c.1/strings/0x409/configuration
+echo 120 > configs/c.1/MaxPower
 
+# HID Function Setup
 mkdir -p functions/hid.usb0
-echo 0 > functions/hid.usb0/protocol
-echo 0 > functions/hid.usb0/subclass
+echo 1 > functions/hid.usb0/protocol
+echo 1 > functions/hid.usb0/subclass
 echo 8 > functions/hid.usb0/report_length
 
-# Sample HID report descriptor (2 axes, 5 buttons)
+# HID Report Descriptor for a standard keyboard
 echo -ne \
-'\x05\x01\x09\x04\xA1\x01\x15\x00\x26\xFF\x00\x75\x08\x95\x02\x09\x30\x09\x31\x81\x02'\
-'\x05\x09\x19\x01\x29\x05\x15\x00\x25\x01\x75\x01\x95\x05\x81\x02\x75\x03\x95\x01\x81\x03\xC0' \
+'\x05\x01\x09\x06\xa1\x01\x05\x07\x19\xe0\x29\xe7\x15\x00\x25\x01\x75\x01\x95\x08\x81\x02' \
 > functions/hid.usb0/report_desc
 
+# Link the HID function to the config
 ln -s functions/hid.usb0 configs/c.1/
-echo "$(ls /sys/class/udc)" > UDC
-echo "USB HID gadget initialized."
-EOF
 
-chmod +x "$GADGET_SCRIPT"
+# Bind gadget to UDC
+UDC=$(ls /sys/class/udc | head -n 1)
+echo "$UDC" > UDC
 
-echo "Step 3: Register systemd service..."
-
-SERVICE_FILE="/etc/systemd/system/usb-gadget.service"
-cat << EOF | sudo tee "$SERVICE_FILE" > /dev/null
-[Unit]
-Description=EV3 USB Gadget Setup
-After=multi-user.target
-
-[Service]
-Type=oneshot
-ExecStart=$GADGET_SCRIPT
-RemainAfterExit=true
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reexec
-sudo systemctl enable usb-gadget.service
-
-echo "Setup complete! Please reboot to activate gadget mode:"
-echo "sudo reboot"
+echo "HID gadget configured successfully!"
+echo "You can now send HID reports to /dev/hidg0 (e.g., echo -ne '\\x00\\x00\\x04\\x00\\x00\\x00\\x00\\x00' > /dev/hidg0 for 'a' key)"
